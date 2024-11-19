@@ -1,168 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, Image, ScrollView, StyleSheet, Text, Alert, ToastAndroid, StatusBar } from 'react-native';
-import ImagePicker from 'react-native-image-crop-picker';
-import RNFS from 'react-native-fs';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { ALERT_TYPE, Dialog, AlertNotificationRoot, Toast } from 'react-native-alert-notification';
+import React, { useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ToastAndroid, Alert, LogBox } from 'react-native';
+import { authorize } from 'react-native-app-auth';
+import AzureAuth from 'react-native-azure-auth';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import auth from '@react-native-firebase/auth';
+LogBox.ignoreAllLogs()
+
+const TENANT_ID = '7da7b706-601a-468d-a6c2-a2e74c62af76';
+const CLIENT_ID = '25b62871-76db-4921-a999-a0bd9f45f492';
+
+const azureAuth = new AzureAuth({
+  tenantId: TENANT_ID,
+  clientId: CLIENT_ID,
+});
+
+const configs = {
+  identityserver: {
+    issuer: `https://login.microsoftonline.com/${TENANT_ID}/v2.0`,
+    clientId: CLIENT_ID,
+    redirectUrl: Platform.OS === 'android'
+      ? 'com.community360connect://com.community360connect/android/callback'
+      : null,
+    additionalParameters: {},
+    scopes: ['openid', 'profile', 'email', 'phone', 'address', 'User.Read'],
+  },
+};
+
 const App = () => {
-  const [images, setImages] = useState([]);
+  GoogleSignin.configure({
+    webClientId: '225695230346-j60s61g5f2ogn57410obke57kbf3ldkk.apps.googleusercontent.com',
+  });
 
-  useEffect(() => {
-    requestPermissions();
-  }, []);
+  const handleGoogleSignIn = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      console.log(userInfo)
+      const idToken = userInfo?.data?.idToken;
 
-  const requestPermissions = async () => {
-    const cameraStatus = await check(PERMISSIONS.ANDROID.CAMERA);
-    const photoStatus = await check(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
-    const writeStatus = await check(PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE);
+      if (!idToken) throw new Error('idToken is not available in the response');
 
-    if (cameraStatus !== RESULTS.GRANTED) {
-      await request(PERMISSIONS.ANDROID.CAMERA);
-    }
+      const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+      await auth().signInWithCredential(googleCredential);
 
-    if (photoStatus !== RESULTS.GRANTED) {
-      await request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
-    }
+      console.log('Sign-in successful');
+      ToastAndroid.show('Sign-in successful',ToastAndroid.LONG)
+      const { name, email } = userInfo?.data?.user || {};
+      Alert.alert('Login Successful', `Name: ${name}\nEmail: ${email}`);
+    } catch (error) {
+      console.error('Google Sign-In Error:', error);
 
-    if (writeStatus !== RESULTS.GRANTED) {
-      await request(PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE);
-    }
-  };
-
-  const pickMultipleImages = () => {
-    ImagePicker.openPicker({
-      multiple: true,
-    }).then(selectedImages => {
-      setImages(selectedImages.map(img => {
-        return { uri: img.path, width: img.width, height: img.height, mime: img.mime };
-      }));
-    }).catch(e => console.log(e));
-  };
-
-  const openCamera = () => {
-    ImagePicker.openCamera({
-      width: 300,
-      height: 400,
-      cropping: true,
-    }).then(image => {
-      setImages([...images, { uri: image.path, width: image.width, height: image.height, mime: image.mime }]);
-    }).catch(e => console.log(e));
-  };
-
-  const saveImages = async () => {
-    const picturesDir = `${RNFS.ExternalDirectoryPath}/Pictures`;
-    await RNFS.mkdir(picturesDir);
-
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
-      const filePath = image.uri;
-      const newFilePath = `${picturesDir}/image_${i}.jpg`;
-
-      try {
-        const exists = await RNFS.exists(filePath);
-        if (exists) {
-          await RNFS.moveFile(filePath, newFilePath);
-          console.log('Image moved to', newFilePath);
-          Toast.show({
-            type: ALERT_TYPE.SUCCESS,
-            title: 'Success',
-            textBody: `Image moved to ${newFilePath}`,
-          })
-          setImages([])
-        } else {
-          console.log('File does not exist:', filePath);
-          ToastAndroid.show('File does not exist',ToastAndroid.LONG)
-          Toast.show({
-            type: ALERT_TYPE.WARNING,
-            title: 'Failed',
-            textBody: `File does not exist`,
-          })
-          setImages([])
+      if (error.code) {
+        switch (error.code) {
+          case statusCodes.SIGN_IN_CANCELLED:
+            console.log('User cancelled the login');
+            break;
+          case statusCodes.IN_PROGRESS:
+            console.log('Sign-in in progress');
+            break;
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            console.log('Play services not available or outdated');
+            break;
+          default:
+            console.log('Unknown error:', error.message);
         }
-      } catch (error) {
-        console.log('Error moving file:', error);
       }
     }
   };
 
-  return (
-    <AlertNotificationRoot>
-<StatusBar backgroundColor={'#4CAF50'}/>
-    <View style={styles.container}>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={pickMultipleImages}>
-          <Icon name="photo-library" size={30} color="#fff" />
-          <Text style={styles.buttonText}>Pick Images</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={openCamera}>
-          <Icon name="photo-camera" size={30} color="#fff" />
-          <Text style={styles.buttonText}>Open Camera</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={saveImages}>
-          <Icon name="save" size={30} color="#fff" />
-          <Text style={styles.buttonText}>Save Images</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView contentContainerStyle={styles.galleryContainer}>
-        {images.length > 0 ? (
-          images.map((image, index) => (
-            <Image
-              key={index}
-              style={styles.image}
-              source={{ uri: image.uri }}
-            />
-          ))
-        ) : (
-          <Text style={styles.noImagesText}>No images selected</Text>
-        )}
-      </ScrollView>
-    </View>
-    </AlertNotificationRoot>
+  const handleLogin = useCallback(async () => {
+    try {
+      const result = await authorize(configs.identityserver);
+      console.log('Result:', result);
 
+      if (result) {
+        const info = await azureAuth.auth.msGraphRequest({
+          token: result.accessToken,
+          path: '/me',
+        });
+        console.log('info', info);
+      }
+    } catch (error) {
+      console.error('Error:', JSON.stringify(error, null, 2));
+    }
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.headerText}>Welcome to the Community App</Text>
+
+      <TouchableOpacity style={styles.microsoftButton} onPress={handleLogin}>
+        <Text style={styles.microsoftButtonText}>Sign in with Microsoft</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
+        <Text style={styles.googleButtonText}>Continue with Google</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: '#1a1a2e',
     alignItems: 'center',
-    flexDirection: 'row',
+    justifyContent: 'center',
+    padding: 20,
   },
-  buttonText: {
+  headerText: {
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#fff',
-    marginLeft: 5,
-    fontSize:11
-  },
-  galleryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  image: {
-    width: 100,
-    height: 100,
-    margin: 5,
-    borderRadius: 10,
-  },
-  noImagesText: {
-    fontSize: 18,
-    color: '#757575',
+    marginBottom: 30,
     textAlign: 'center',
-    marginTop: '60%',
-    fontStyle:"italic"
+  },
+  microsoftButton: {
+    backgroundColor: '#0078d4',
+    width: '90%',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+  },
+  microsoftButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  googleButton: {
+    backgroundColor: '#db4437',
+    width: '90%',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+  },
+  googleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

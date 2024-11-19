@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "225695230346",
+    "project_id": "sociallogins-812d6",
+    "storage_bucket": "sociallogins-812d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225695230346:android:ad6d5dee2c4fb7eda60073",
+        "android_client_info": {
+          "package_name": "com.bosscheat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "225695230346-j9tqdq404i4h0o52nuulojh6eq99e94f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bosscheat",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "225695230346-j60s61g5f2ogn57410obke57kbf3ldkk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWO3bvjBTKaP8ZCNxU_hfHhu7fl0wRDZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "225695230346-j60s61g5f2ogn57410obke57kbf3ldkk.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
